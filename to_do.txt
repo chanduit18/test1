@@ -98,5 +98,50 @@
     Resources allocated to the server,
     VIP info (if configured),
     Application access control lists
+    
+    
+    
+    
+    
+We can split up the requirements into stages or basic and advanced.
+
+Radius, HTTP Statistics, CPU Utilization are basic ones. We can add the other feasible/required functionalities one by one. 
+
+Radius Statistics with the corresponding Samba logs is a little tricky, below is why
+
+Within Radius we need to link the Highest Request processing time requests with their corresponding entries in the Samba_<NetBIOSName> Folder and then also log.wb-<NetBIOSName> log file.
+
+However I think we can try to find this username across all log files in the samba_<> folder as the user might actually belong to a trusted Domain and the NetBIOS name from the Radius logs and the NetBIOS name from the log folder could be different.
+
+We should search in the Samba logs for the username within (Auth Time + MS-CHAP Authentication Time +1) which should be more than enough 
+
+We are seeing some cases where we are not seeing the username in the INFO Radius logs where the Request processing time is really high. We need to catch these exceptions. 
+
+We should search in the Samba logs for this keyword "pam auth crap domain" along with username separately as the username does not follow the keyword
+
+Ex: 
+
+Samba logs for a Machine Auth with username host/I05394D162.LUC.AD.SBI
+
+[2019/06/28 11:03:27.627144,  3, pid=25537] ../source3/winbindd/winbindd_pam.c:2061(winbindd_dual_pam_auth_crap)
+  [ 6797]: pam auth crap domain: LUC.AD.SBI user: I05394D162$
+  
+  The response for this came back at 
+  
+  [2019/06/28 11:03:29.014968,  5, pid=25537] ../source3/winbindd/winbindd_pam.c:2033(winbind_dual_SamLogon)
+  NTLM CRAP authentication for user [LUC.AD.SBI]\[I05394D162$] returned NT_STATUS_OK
+  
+  
+ Few things to note from the above logs. 
+ 
+ 
+ The pid=25537 corresponds to this request and we need to calculate the delta between "pam auth crap domain: LUC.AD.SBI user: I05394D162$" and "NTLM CRAP authentication for user" with "[I05394D162$] returned " 
+ 
+ There are lot of Customer logs uploaded to 10.23.194.31 chandu/password /home/chandu/Customer_Logs/
+we have SBI and other customer's logs as well, if you want to refer logs 
+
+The below grep command will give you the requests taking the most of Request processing time. 
+
+cat radius.log.* | grep -i "processing time =" | rev | cut -d' ' -f2,11 | rev | sort -k2 -rn | more
 
 
